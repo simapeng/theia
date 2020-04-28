@@ -199,9 +199,8 @@ export class Emitter<T = any> {
 
                 return result;
             }, {
-                    maxListeners: Emitter.LEAK_WARNING_THRESHHOLD
-                }
-            );
+                maxListeners: Emitter.LEAK_WARNING_THRESHHOLD
+            });
         }
         return this._event;
     }
@@ -296,7 +295,6 @@ export class Emitter<T = any> {
 }
 
 export interface WaitUntilEvent {
-    /* eslint-disable @typescript-eslint/no-explicit-any */
     /**
      * Allows to pause the event loop until the provided thenable resolved.
      *
@@ -305,24 +303,28 @@ export interface WaitUntilEvent {
      * @param thenable A thenable that delays execution.
      */
     waitUntil(thenable: Promise<any>): void;
-    /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 export namespace WaitUntilEvent {
-    export async function fire<T extends WaitUntilEvent>(
-        emitter: Emitter<T>,
-        event: Pick<T, Exclude<keyof T, 'waitUntil'>>,
-        timeout: number | undefined = undefined
-    ): Promise<void> {
-        const waitables: Promise<void>[] = [];
+    /**
+     * Fires an event with a `waitUntil` field and handles its semantics on your behalf.
+     *
+     * @param emitter
+     * @param event
+     * @param timeout
+     * @returns returned values of promises passed to `waitUntil`, `undefined` on timeout.
+     */
+    export async function fire<E extends WaitUntilEvent>(emitter: Emitter<E>, event: Omit<E, 'waitUntil'>): Promise<any[]>;
+    export async function fire<E extends WaitUntilEvent>(emitter: Emitter<E>, event: Omit<E, 'waitUntil'>, timeout: number): Promise<any[] | undefined>;
+    export async function fire<E extends WaitUntilEvent>(emitter: Emitter<E>, event: Omit<E, 'waitUntil'>, timeout?: number): Promise<any[] | undefined> {
+        const waitables: Promise<any>[] = [];
         const asyncEvent = Object.assign(event, {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             waitUntil: (thenable: Promise<any>) => {
                 if (Object.isFrozen(waitables)) {
                     throw new Error('waitUntil cannot be called asynchronously.');
                 }
                 waitables.push(thenable);
             }
-        }) as T;
+        }) as E;
         try {
             emitter.fire(asyncEvent);
             // Asynchronous calls to `waitUntil` should fail.
@@ -331,12 +333,12 @@ export namespace WaitUntilEvent {
             delete asyncEvent['waitUntil'];
         }
         if (!waitables.length) {
-            return;
+            return [];
         }
         if (timeout !== undefined) {
-            await Promise.race([Promise.all(waitables), new Promise(resolve => setTimeout(resolve, timeout))]);
+            return Promise.race([Promise.all(waitables), new Promise<undefined>(resolve => setTimeout(resolve, timeout, undefined))]);
         } else {
-            await Promise.all(waitables);
+            return Promise.all(waitables);
         }
     }
 }
