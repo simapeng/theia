@@ -15,7 +15,7 @@
  ********************************************************************************/
 import { inject, injectable } from 'inversify';
 import URI from '@theia/core/lib/common/uri';
-import { Command, CommandContribution, CommandRegistry, DisposableCollection, MenuContribution, MenuModelRegistry, Mutable, MenuAction } from '@theia/core';
+import { Command, CommandContribution, CommandRegistry, DisposableCollection, MenuContribution, MenuModelRegistry, Mutable, MenuAction, SelectionService } from '@theia/core';
 import { DiffUris, Widget } from '@theia/core/lib/browser';
 import { TabBarToolbarContribution, TabBarToolbarRegistry, TabBarToolbarItem } from '@theia/core/lib/browser/shell/tab-bar-toolbar';
 import { EditorContextMenu, EditorManager, EditorOpenerOptions, EditorWidget } from '@theia/editor/lib/browser';
@@ -26,6 +26,7 @@ import { GitSyncService } from './git-sync-service';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import { GitRepositoryProvider } from './git-repository-provider';
 import { GitErrorHandler } from '../browser/git-error-handler';
+import { ScmService } from '@theia/scm/lib/browser/scm-service';
 import { ScmWidget } from '@theia/scm/lib/browser/scm-widget';
 import { ScmTreeWidget } from '@theia/scm/lib/browser/scm-tree-widget';
 import { ScmResource, ScmCommand } from '@theia/scm/lib/browser/scm-provider';
@@ -33,6 +34,7 @@ import { ProgressService } from '@theia/core/lib/common/progress-service';
 import { GitPreferences } from './git-preferences';
 import { ColorContribution } from '@theia/core/lib/browser/color-application-contribution';
 import { ColorRegistry } from '@theia/core/lib/browser/color-registry';
+import { ScmResourceAwareCommandHandler, ScmResourceCommandHandler } from '@theia/scm/lib/browser/scm-resource-command-handler';
 
 export namespace GIT_COMMANDS {
     export const CLONE = {
@@ -210,6 +212,8 @@ export class GitContribution implements CommandContribution, MenuContribution, T
     @inject(CommandRegistry) protected readonly commands: CommandRegistry;
     @inject(ProgressService) protected readonly progressService: ProgressService;
     @inject(GitPreferences) protected readonly gitPreferences: GitPreferences;
+    @inject(SelectionService) protected readonly selectionService: SelectionService;
+    @inject(ScmService) protected readonly scmService: ScmService;
 
     onStart(): void {
         this.updateStatusBar();
@@ -410,41 +414,38 @@ export class GitContribution implements CommandContribution, MenuContribution, T
             execute: async () => this.withProgress(() => this.addSignOff()),
             isEnabled: () => !!this.repositoryTracker.selectedRepository
         });
-        registry.registerCommand(GIT_COMMANDS.UNSTAGE, {
-            execute: (arg: string |  ScmResource[] | ScmResource) => {
-                const uris =
-                    typeof arg === 'string' ? [ arg ] :
-                    Array.isArray(arg) ? arg.map(r => r.sourceUri.toString()) :
-                    [ arg.sourceUri.toString() ];
-                const provider = this.repositoryProvider.selectedScmProvider;
-                return provider && this.withProgress(() => provider.unstage(uris));
-            },
-            isEnabled: (arg: string |  ScmResource[] | ScmResource) => !!this.repositoryProvider.selectedScmProvider
-                && (!Array.isArray(arg) || arg.length !== 0)
-        });
-        registry.registerCommand(GIT_COMMANDS.STAGE, {
-            execute: (arg: string | ScmResource[] | ScmResource) => {
-                const uris =
-                    typeof arg === 'string' ? [ arg ] :
-                    Array.isArray(arg) ? arg.map(r => r.sourceUri.toString()) :
-                    [ arg.sourceUri.toString() ];
+        registry.registerCommand(
+            GIT_COMMANDS.UNSTAGE,
+            this.newScmResourceAwareCommandHandler({
+                execute: (arg: ScmResource[]) => {
+                    const uris = arg.map(r => r.sourceUri.toString());
+                    const provider = this.repositoryProvider.selectedScmProvider;
+                    return provider && this.withProgress(() => provider.unstage(uris));
+                },
+            isEnabled: (arg: ScmResource[]) => !!this.repositoryProvider.selectedScmProvider
+                && arg.length !== 0
+            })
+        );
+        registry.registerCommand(
+            GIT_COMMANDS.STAGE,
+            this.newScmResourceAwareCommandHandler({
+            execute: (arg: ScmResource[]) => {
+                const uris = arg.map(r => r.sourceUri.toString());
                 const provider = this.repositoryProvider.selectedScmProvider;
                 return provider && this.withProgress(() => provider.stage(uris));
             },
-            isEnabled: (arg: string |  ScmResource[] | ScmResource) => !!this.repositoryProvider.selectedScmProvider
-                && (!Array.isArray(arg) || arg.length !== 0)
-        });
+            isEnabled: (arg: ScmResource[]) => !!this.repositoryProvider.selectedScmProvider
+                && arg.length !== 0
+            })
+        );
         registry.registerCommand(GIT_COMMANDS.DISCARD, {
-            execute: (arg: string | ScmResource[] | ScmResource) => {
-                const uris =
-                    typeof arg === 'string' ? [ arg ] :
-                    Array.isArray(arg) ? arg.map(r => r.sourceUri.toString()) :
-                    [ arg.sourceUri.toString() ];
+            execute: (arg: ScmResource[]) => {
+                const uris = arg.map(r => r.sourceUri.toString());
                 const provider = this.repositoryProvider.selectedScmProvider;
                 return provider && this.withProgress(() => provider.discard(uris));
             },
-            isEnabled: (arg: string |  ScmResource[] | ScmResource) => !!this.repositoryProvider.selectedScmProvider
-                && (!Array.isArray(arg) || arg.length !== 0)
+            isEnabled: (arg: ScmResource[]) => !!this.repositoryProvider.selectedScmProvider
+                && arg.length !== 0
         });
         registry.registerCommand(GIT_COMMANDS.OPEN_CHANGED_FILE, {
             execute: (arg: string | ScmResource) => {
@@ -862,6 +863,13 @@ export class GitContribution implements CommandContribution, MenuContribution, T
             }
         });
     }
+
+    protected newScmResourceAwareCommandHandler(handler: ScmResourceCommandHandler): ScmResourceAwareCommandHandler {
+        return new ScmResourceAwareCommandHandler(
+            handler
+        );
+    }
+
 }
 export interface GitOpenFileOptions {
     readonly uri: URI

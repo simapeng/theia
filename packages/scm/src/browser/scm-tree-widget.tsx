@@ -120,6 +120,7 @@ export class ScmTreeWidget extends TreeWidget {
                 groupLabel={node.groupLabel}
                 renderExpansionToggle={ () => this.renderExpansionToggle(node, props) }
                 contextMenuRenderer={this.contextMenuRenderer}
+                contextMenuArgsFromSelection={this.getContextMenuArgsFromSelection}
                 commands={this.commands}
                 menus={this.menus}
                 contextKeys={this.contextKeys}
@@ -139,6 +140,7 @@ export class ScmTreeWidget extends TreeWidget {
                 sourceUri={new URI(node.sourceUri)}
                 renderExpansionToggle={ () => this.renderExpansionToggle(node, props) }
                 contextMenuRenderer={this.contextMenuRenderer}
+                contextMenuArgsFromSelection={this.getContextMenuArgsFromSelection}
                 commands={this.commands}
                 menus={this.menus}
                 contextKeys={this.contextKeys}
@@ -148,11 +150,13 @@ export class ScmTreeWidget extends TreeWidget {
             return React.createElement('div', attributes, content);
         }
         if (ScmFileChangeNode.is(node)) {
+            // TODO remove this dup code 4 lines
             const parentNode = node.parent;
             if (!(parentNode && (ScmFileChangeFolderNode.is(parentNode) || ScmFileChangeGroupNode.is(parentNode)))) {
                 return '';
             }
             const groupId = parentNode.groupId;
+
             const name = this.labelProvider.getName(new URI(node.sourceUri));
             const parentPath =
                 (node.parent && ScmFileChangeFolderNode.is(node.parent))
@@ -162,6 +166,7 @@ export class ScmTreeWidget extends TreeWidget {
                 key={node.sourceUri}
                 repository={repository}
                 contextMenuRenderer={this.contextMenuRenderer}
+                contextMenuArgsFromSelection={this.getContextMenuArgsFromSelection}
                 commands={this.commands}
                 menus={this.menus}
                 contextKeys={this.contextKeys}
@@ -182,18 +187,73 @@ export class ScmTreeWidget extends TreeWidget {
         return super.renderNode(node, props);
     }
 
+    protected readonly getContextMenuArgsFromSelection = () => this.doGetContextMenuArgsFromSelection();
+    protected doGetContextMenuArgsFromSelection(): any[] {
+        const repository = this.scmService.selectedRepository;
+        if (!repository) {
+            return [[]];
+        }
+
+        const x = this.model.selectedNodes;
+
+        const uris: ScmResource[] = [];
+        for (const node of x) {
+            if (ScmFileChangeNode.is(node)) {
+                const parentNode = node.parent;
+                if (!(parentNode && (ScmFileChangeFolderNode.is(parentNode) || ScmFileChangeGroupNode.is(parentNode)))) {
+                    continue;
+                }
+                const groupId = parentNode.groupId;
+                const group = this.findGroup(repository, groupId);
+                if (group) {
+                    const selectedResource = group.resources.find(r => String(r.sourceUri) === node.sourceUri);
+                    if (selectedResource) {
+                        uris.push(selectedResource);
+                    }
+                }
+            }
+            if (ScmFileChangeFolderNode.is(node)) {
+                const group = this.findGroup(repository, node.groupId);
+                if (group) {
+                    this.collectUris(uris, node, group);
+                }
+            }
+        }
+        // TODO remove dups here?
+        return [
+            uris
+        ];
+    }
+
+    // TODO remove this dup
+    protected findGroup(repository: ScmRepository, groupId: string): ScmResourceGroup | undefined {
+        return repository.provider.groups.find(g => g.id === groupId);
+    }
+
+    // TODO remove this dup
+    protected collectUris(uris: ScmResource[], node: TreeNode, group: ScmResourceGroup): void {
+        if (ScmFileChangeFolderNode.is(node)) {
+            for (const child of node.children) {
+                this.collectUris(uris, child, group);
+            }
+        } else if (ScmFileChangeNode.is(node)) {
+            const resource = group.resources.find(r => String(r.sourceUri) === node.sourceUri)!;
+            uris.push(resource);
+        }
+    }
+
     protected createContainerAttributes(): React.HTMLAttributes<HTMLElement> {
         const repository = this.scmService.selectedRepository;
         if (repository) {
             const select = () => {
-                const selectedResource = this.selectionService.selection;
-                if (!TreeNode.is(selectedResource) || !ScmFileChangeFolderNode.is(selectedResource) && !ScmFileChangeNode.is(selectedResource)) {
-                    const nonEmptyGroup = repository.provider.groups
-                        .find(g => g.resources.length !== 0);
-                    if (nonEmptyGroup) {
-                        this.selectionService.selection = nonEmptyGroup.resources[0];
-                    }
-                }
+                // const selectedResource = this.selectionService.selection;
+                // if (!TreeNode.is(selectedResource) || !ScmFileChangeFolderNode.is(selectedResource) && !ScmFileChangeNode.is(selectedResource)) {
+                //     const nonEmptyGroup = repository.provider.groups
+                //         .find(g => g.resources.length !== 0);
+                //     if (nonEmptyGroup) {
+                //         this.selectionService.selection = nonEmptyGroup.resources[0];
+                //     }
+                // }
             };
             return {
                 ...super.createContainerAttributes(),
@@ -411,6 +471,7 @@ export namespace ScmTreeWidget {
         contextKeys: ScmContextKeyService;
         labelProvider: LabelProvider;
         contextMenuRenderer: ContextMenuRenderer;
+        contextMenuArgsFromSelection: () => any[],
         corePreferences?: CorePreferences;
     }
 }
@@ -452,14 +513,14 @@ export abstract class ScmElement<P extends ScmElement.Props = ScmElement.Props> 
 
     protected renderContextMenu = (event: React.MouseEvent<HTMLElement>) => {
         event.preventDefault();
-        const { groupId, contextKeys, contextMenuRenderer } = this.props;
+        const { groupId, contextKeys, contextMenuRenderer, contextMenuArgsFromSelection } = this.props;
         const currentScmResourceGroup = contextKeys.scmResourceGroup.get();
         contextKeys.scmResourceGroup.set(groupId);
         try {
             contextMenuRenderer.render({
                 menuPath: this.contextMenuPath,
                 anchor: event.nativeEvent,
-                args: this.contextMenuArgs
+                args: contextMenuArgsFromSelection()
             });
         } finally {
             contextKeys.scmResourceGroup.set(currentScmResourceGroup);
@@ -548,10 +609,10 @@ export class ScmResourceComponent extends ScmElement<ScmResourceComponent.Props>
         const group = this.findGroup(this.props.repository, this.props.groupId);
         if (group) {
             const selectedResource = group.resources.find(r => String(r.sourceUri) === this.props.sourceUri)!;
-            return [selectedResource, false];  // TODO support multiselection
+            return [[selectedResource]];
         } else {
-            // Repository status not yet available. Empty args disables the action.
-            return [];
+            // Repository status not yet available. Empty resource list disables the action.
+            return [[]];
         }
     }
 
@@ -671,22 +732,22 @@ export class ScmResourceFolderElement extends ScmElement<ScmResourceFolderElemen
 
     protected readonly contextMenuPath = ScmTreeWidget.RESOURCE_FOLDER_CONTEXT_MENU;
     protected get contextMenuArgs(): any[] {
-        const uris: ScmResource[] = [];
+        const resources: ScmResource[] = [];
         const group = this.findGroup(this.props.repository, this.props.groupId);
         if (group) {
-            this.collectUris(uris, this.props.node, group);
+            this.collectResources(resources, this.props.node, group);
         }
-        return [uris, true];
+        return [resources];
     }
 
-    protected collectUris(uris: ScmResource[], node: TreeNode, group: ScmResourceGroup): void {
+    protected collectResources(resources: ScmResource[], node: TreeNode, group: ScmResourceGroup): void {
         if (ScmFileChangeFolderNode.is(node)) {
             for (const child of node.children) {
-                this.collectUris(uris, child, group);
+                this.collectResources(resources, child, group);
             }
         } else if (ScmFileChangeNode.is(node)) {
             const resource = group.resources.find(r => String(r.sourceUri) === node.sourceUri)!;
-            uris.push(resource);
+            resources.push(resource);
         }
     }
 }

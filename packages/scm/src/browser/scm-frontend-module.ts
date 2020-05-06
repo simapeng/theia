@@ -135,6 +135,7 @@ export function createFileChangeTreeContainer(parent: interfaces.Container): Con
         expansionTogglePadding: 22,
         virtualized: true,
         search: true,
+        multiSelect: true,
     });
     child.bind(ScmTreeModelProps).toConstantValue({
         defaultExpansion: 'expanded',
