@@ -2,6 +2,7 @@
 
 ## v1.2.0
 
+- [plugin] support all vscode.workspace.fs APIs for registered fs providers only (not yet real file system)
 - [application-manager] enable clients to persistenly change windowOptions [#7787](https://github.com/eclipse-theia/theia/pull/7787)
 
 Breaking changes:
