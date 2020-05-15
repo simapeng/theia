@@ -90,6 +90,24 @@ function doEqualsIgnoreCase(a: string, b: string, stopAt = a.length): boolean {
 }
 
 /**
+ * @returns the length of the common prefix of the two strings.
+ */
+export function commonPrefixLength(a: string, b: string): number {
+
+    let i: number;
+    const len = Math.min(a.length, b.length);
+
+    for (i = 0; i < len; i++) {
+        if (a.charCodeAt(i) !== b.charCodeAt(i)) {
+            return i;
+        }
+    }
+
+    return len;
+}
+
+
+/**
  * Escapes regular expression characters in a given string
  */
 export function escapeRegExpCharacters(value: string): string {
