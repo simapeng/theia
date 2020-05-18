@@ -510,6 +510,13 @@ export interface WorkspaceExt {
     $onWillRename(event: FileWillMoveEvent): Promise<any>;
 }
 
+export interface TimelineExt {
+}
+
+export interface TimelineMain {
+    $registerTimelineProvider(sourceControlHandle: number, id: string, label: string): void;
+}
+
 export interface DialogsMain {
     $showOpenDialog(options: OpenDialogOptionsMain): Promise<string[] | undefined>;
     $showSaveDialog(options: SaveDialogOptionsMain): Promise<string | undefined>;
@@ -1383,7 +1390,8 @@ export const PLUGIN_RPC_CONTEXT = {
     SCM_MAIN: createProxyIdentifier<ScmMain>('ScmMain'),
     DECORATIONS_MAIN: createProxyIdentifier<DecorationsMain>('DecorationsMain'),
     WINDOW_MAIN: createProxyIdentifier<WindowMain>('WindowMain'),
-    CLIPBOARD_MAIN: <ProxyIdentifier<ClipboardMain>>createProxyIdentifier<ClipboardMain>('ClipboardMain')
+    CLIPBOARD_MAIN: <ProxyIdentifier<ClipboardMain>>createProxyIdentifier<ClipboardMain>('ClipboardMain'),
+    TIMELINE_MAIN: <ProxyIdentifier<TimelineMain>>createProxyIdentifier<TimelineMain>('TimelineMain')
 };
 
 export const MAIN_RPC_CONTEXT = {
@@ -1409,7 +1417,8 @@ export const MAIN_RPC_CONTEXT = {
     DEBUG_EXT: createProxyIdentifier<DebugExt>('DebugExt'),
     FILE_SYSTEM_EXT: createProxyIdentifier<FileSystemExt>('FileSystemExt'),
     SCM_EXT: createProxyIdentifier<ScmExt>('ScmExt'),
-    DECORATIONS_EXT: createProxyIdentifier<DecorationsExt>('DecorationsExt')
+    DECORATIONS_EXT: createProxyIdentifier<DecorationsExt>('DecorationsExt'),
+    TIMELINE_EXT: createProxyIdentifier<TimelineExt>('TimeLineExt')
 };
 
 export interface TasksExt {
