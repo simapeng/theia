@@ -1,5 +1,5 @@
 /********************************************************************************
- * Copyright (C) 2018 Ericsson and others.
+ * Copyright (C) 2020 Arm and others.
  *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License v. 2.0 which is available at
@@ -14,41 +14,51 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-import { inject, injectable } from 'inversify';
+import { injectable, inject } from 'inversify';
+import { Message } from '@phosphor/messaging';
 import {
-    ContextMenuRenderer,
+    TreeWidget,
+    TreeNode,
     TreeProps,
-    TreeWidget
-} from '@theia/core/lib/browser';
+    ExpandableTreeNode
+} from '@theia/core/lib/browser/tree';
 import { TimelineTreeModel } from './timeline-tree-model';
-import { WorkspaceCommandContribution } from '@theia/workspace/lib/browser';
+import { ContextMenuRenderer } from '@theia/core/lib/browser';
 
 @injectable()
 export class TimelineTreeWidget extends TreeWidget {
-    /**
-     * The widget `id`.
-     */
-    static readonly ID = 'timeline.widget';
-    /**
-     * The widget `label` which is used for display purposes.
-     */
-    static readonly LABEL = 'Getting Started';
+
+    static ID = 'timeline-resource-widget-1';
 
     constructor(
         @inject(TreeProps) readonly props: TreeProps,
         @inject(TimelineTreeModel) readonly model: TimelineTreeModel,
-        @inject(ContextMenuRenderer) contextMenuRenderer: ContextMenuRenderer,
-        @inject(WorkspaceCommandContribution) commandContribution: WorkspaceCommandContribution
+        @inject(ContextMenuRenderer) protected readonly contextMenuRenderer: ContextMenuRenderer
     ) {
         super(props, model, contextMenuRenderer);
-
         this.id = TimelineTreeWidget.ID;
-        this.title.label = TimelineTreeWidget.LABEL;
-        this.title.caption = 'Call Hierarchy';
-        // this.title.iconClass = 'fa call-hierarchy-tab-icon';
-        this.title.closable = true;
-        commandContribution.onDidCreateNewFile(event => {
-            this.model.initializeRoot();
-        });
+        this.addClass('groups-outer-container');
     }
+
+    protected onAfterAttach(msg: Message): void {
+        super.onAfterAttach(msg);
+        const children: TreeNode [] = [];
+        const root: ExpandableTreeNode = {
+            id: 'root-node-id',
+            name: 'Apply the preference to selected preferences file',
+            parent: undefined,
+            visible: true,
+            children: children,
+            expanded: true,
+        };
+        const node: TreeNode = {
+            id: 'node-id-property',
+            name: 'node-name',
+            parent: root,
+            visible: true
+        };
+        children.push(node);
+        this.model.root = root;
+    }
+
 }

@@ -14,17 +14,43 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-import { ContainerModule } from 'inversify';
+import { Container, ContainerModule, interfaces } from 'inversify';
 import { WidgetFactory } from '@theia/core/lib/browser/widget-manager';
-import { TimelineTreeWidget } from './timeline-tree-widget';
 import { TimelineService } from './timeline-service';
-import { createTimelineTreeWidget } from './timeline-tree-container';
+import { TimelineWidget } from './timeline-widget';
+import { TimelineTreeWidget } from './timeline-tree-widget';
+import { createTreeContainer, TreeModel, TreeModelImpl, TreeWidget } from '@theia/core/lib/browser';
+import { TimelineTreeModel } from './timeline-tree-model';
 
 export default new ContainerModule(bind => {
     bind(TimelineService).toSelf().inSingletonScope();
-    bind(TimelineTreeWidget).toSelf();
-    bind(WidgetFactory).toDynamicValue(context => ({
+
+    bind(TimelineWidget).toSelf();
+    bind(WidgetFactory).toDynamicValue(({ container }) => ({
+        id: TimelineWidget.ID,
+        createWidget: () => container.get(TimelineWidget)
+    })).inSingletonScope();
+    bind(TimelineTreeWidget).toDynamicValue(ctx => {
+        const child = createScmTreeContainer(ctx.container);
+        return child.get(TimelineTreeWidget);
+    });
+    bind(WidgetFactory).toDynamicValue(({ container }) => ({
         id: TimelineTreeWidget.ID,
-        createWidget: () => createTimelineTreeWidget(context.container)
+        createWidget: () => container.get(TimelineTreeWidget)
     })).inSingletonScope();
 });
+
+export function createScmTreeContainer(parent: interfaces.Container): Container {
+    const child = createTreeContainer(parent, {
+        virtualized: true,
+        search: true
+    });
+
+    child.unbind(TreeWidget);
+    child.bind(TimelineTreeWidget).toSelf();
+
+    child.unbind(TreeModelImpl);
+    child.bind(TimelineTreeModel).toSelf();
+    child.rebind(TreeModel).toService(TimelineTreeModel);
+    return child;
+}
