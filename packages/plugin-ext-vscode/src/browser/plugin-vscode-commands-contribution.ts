@@ -54,6 +54,7 @@ import { URI } from 'vscode-uri';
 import { MonacoEditor } from '@theia/monaco/lib/browser/monaco-editor';
 import { TerminalFrontendContribution } from '@theia/terminal/lib/browser/terminal-frontend-contribution';
 import { QuickOpenWorkspace } from '@theia/workspace/lib/browser/quick-open-workspace';
+import { FileNavigatorCommands } from '@theia/navigator/lib/browser/navigator-contribution';
 
 export namespace VscodeCommands {
     export const OPEN: Command = {
@@ -578,6 +579,16 @@ export class PluginVscodeCommandsContribution implements CommandContribution {
             id: 'workbench.action.openRecent'
         }, {
             execute: () => this.quickOpenWorkspace.select()
+        });
+        commands.registerCommand({
+            id: 'explorer.newFolder'
+        }, {
+            execute: () => commands.executeCommand(WorkspaceCommands.NEW_FOLDER.id)
+        });
+        commands.registerCommand({
+            id: 'workbench.view.explorer'
+        }, {
+            execute: () => commands.executeCommand(FileNavigatorCommands.FOCUS.id)
         });
     }
 }
