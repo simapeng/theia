@@ -87,6 +87,24 @@ For example, if you picked `0.1.0` as a version then you should run:
 
 To confirm that the tagging was correctly done, check the repo's [releases](https://github.com/eclipse-theia/theia/releases) page and confirm the release just done is listed there.
 
+## Updating the release page on eclipse
+- Login to eclipse: https://projects.eclipse.org/projects/ecd.theia
+- On the right side panel, select Release / Create a new release
+    Create a new version ex: 1.2.0
+    Select the edit tab
+    - In "The Basic" section
+        - Select the  "Type A" in the IP Due Diligence type
+    - In the "Project Plan"
+        - Deliverables section
+            - Copy from the changelog.md the section about the updates
+        - Compatibility section
+            - Copy the Braking changes from the changelog.md
+- When completing the edition, select "Save" at the bottom of the page.
+- To confirm the data is available,
+    - Open the page https://projects.eclipse.org/projects/ecd.theia
+        - Select the version you just created
+        - Open the Review plan section, you should see the data provided before.
+
 ## Announce release is done
 
 - Update the forum release post to announce that the release is done.
