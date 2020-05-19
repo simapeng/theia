@@ -29,7 +29,6 @@ import * as common from '../common/keybinding';
 
 export enum KeybindingScope {
     DEFAULT,
-    DEFAULT_OVERRIDING,
     USER,
     WORKSPACE,
     END
@@ -56,7 +55,7 @@ export interface ResolvedKeybinding extends Keybinding {
 
 export interface ScopedKeybinding extends Keybinding {
     /** Current keybinding scope */
-    scope?: KeybindingScope;
+    scope: KeybindingScope;
 }
 
 export const KeybindingContribution = Symbol('KeybindingContribution');
@@ -100,7 +99,7 @@ export class KeybindingRegistry {
     protected keySequence: KeySequence = [];
 
     protected readonly contexts: { [id: string]: KeybindingContext } = {};
-    protected readonly keymaps: Keybinding[][] = [...Array(KeybindingScope.length)].map(() => []);
+    protected readonly keymaps: ScopedKeybinding[][] = [...Array(KeybindingScope.length)].map(() => []);
 
     @inject(KeyboardLayoutService)
     protected readonly keyboardLayoutService: KeyboardLayoutService;
@@ -167,11 +166,12 @@ export class KeybindingRegistry {
     /**
      * Register a default keybinding to the registry.
      *
+     * Keybindings registered later have higher priority during evaluation.
+     *
      * @param binding
-     * @param override Override existed keybinding
      */
-    registerKeybinding(binding: Keybinding, override?: boolean): Disposable {
-        return this.doRegisterKeybinding(binding, !!override ? KeybindingScope.DEFAULT_OVERRIDING : undefined);
+    registerKeybinding(binding: Keybinding): Disposable {
+        return this.doRegisterKeybinding(binding);
     }
 
     /**
@@ -219,12 +219,14 @@ export class KeybindingRegistry {
     protected doRegisterKeybinding(binding: Keybinding, scope: KeybindingScope = KeybindingScope.DEFAULT): Disposable {
         try {
             this.resolveKeybinding(binding);
-            if (this.containsKeybinding(this.keymaps[scope], binding) && scope !== KeybindingScope.DEFAULT_OVERRIDING) {
+            // TODO: get rid of this check as soon as `context` property is removed
+            if (this.containsKeybinding(this.keymaps[scope], binding)) {
                 throw new Error(`"${binding.keybinding}" is in collision with something else [scope:${scope}]`);
             }
-            this.keymaps[scope].push(binding);
+            const scoped = Object.assign(binding, { scope });
+            this.keymaps[scope].unshift(scoped);
             return Disposable.create(() => {
-                const index = this.keymaps[scope].indexOf(binding);
+                const index = this.keymaps[scope].indexOf(scoped);
                 if (index !== -1) {
                     this.keymaps[scope].splice(index, 1);
                 }
@@ -266,7 +268,7 @@ export class KeybindingRegistry {
      * @param bindings the keybinding reference list
      * @param binding the keybinding to test collisions for
      */
-    containsKeybinding(bindings: Keybinding[], binding: Keybinding): boolean {
+    containsKeybinding(bindings: ScopedKeybinding[], binding: Keybinding): boolean {
         const bindingKeySequence = this.resolveKeybinding(binding);
         const collisions = this.getKeySequenceCollisions(bindings, bindingKeySequence)
             .filter(b => b.context === binding.context && !b.when && !binding.when);
@@ -364,29 +366,12 @@ export class KeybindingRegistry {
     }
 
     /**
-     * Finds collisions for a binding inside a list of bindings (error-free)
-     *
-     * @param bindings the reference bindings
-     * @param binding the binding to match
-     */
-    protected getKeybindingCollisions(bindings: Keybinding[], binding: Keybinding): KeybindingRegistry.KeybindingsResult {
-        const result = new KeybindingRegistry.KeybindingsResult();
-        try {
-            const bindingKeySequence = this.resolveKeybinding(binding);
-            result.merge(this.getKeySequenceCollisions(bindings, bindingKeySequence));
-        } catch (error) {
-            this.logger.warn(error);
-        }
-        return result;
-    }
-
-    /**
      * Finds collisions for a key sequence inside a list of bindings (error-free)
      *
      * @param bindings the reference bindings
      * @param candidate the sequence to match
      */
-    protected getKeySequenceCollisions(bindings: Keybinding[], candidate: KeySequence): KeybindingRegistry.KeybindingsResult {
+    protected getKeySequenceCollisions(bindings: ScopedKeybinding[], candidate: KeySequence): KeybindingRegistry.KeybindingsResult {
         const result = new KeybindingRegistry.KeybindingsResult();
         for (const binding of bindings) {
             try {
@@ -409,28 +394,6 @@ export class KeybindingRegistry {
             } catch (error) {
                 this.logger.warn(error);
             }
-        }
-        return result;
-    }
-
-    /**
-     * Get the lists of keybindings matching fully or partially matching a KeySequence.
-     *
-     * @param keySequence The key sequence for which we are looking for keybindings.
-     */
-    getKeybindingsForKeySequence(keySequence: KeySequence): KeybindingRegistry.KeybindingsResult {
-        const result = new KeybindingRegistry.KeybindingsResult();
-
-        for (let scope = KeybindingScope.END; --scope >= KeybindingScope.DEFAULT;) {
-            const matches = this.getKeySequenceCollisions(this.keymaps[scope], keySequence);
-
-            if (scope === KeybindingScope.DEFAULT_OVERRIDING) {
-                matches.full.reverse();
-                matches.partial.reverse();
-            }
-            matches.full.forEach(binding => binding.scope = scope);
-            matches.partial.forEach(binding => binding.scope = scope);
-            result.merge(matches);
         }
         return result;
     }
@@ -578,10 +541,9 @@ export class KeybindingRegistry {
 
         this.keyboardLayoutService.validateKeyCode(keyCode);
         this.keySequence.push(keyCode);
-        const bindings = this.getKeybindingsForKeySequence(this.keySequence);
-        const full = bindings.full.find(binding => this.isEnabled(binding, event));
-        const partial = bindings.partial.find(binding => (!full || binding.scope! > full.scope!) && this.isEnabled(binding, event));
-        if (partial) {
+        const match = this.matchKeybiding(this.keySequence, event);
+
+        if (match && match.kind === 'partial') {
             /* Accumulate the keysequence */
             event.preventDefault();
             event.stopPropagation();
@@ -592,12 +554,39 @@ export class KeybindingRegistry {
                 priority: 2
             });
         } else {
-            if (full) {
-                this.executeKeyBinding(full, event);
+            if (match && match.kind === 'full') {
+                this.executeKeyBinding(match.binding, event);
             }
             this.keySequence = [];
             this.statusBar.removeElement('keybinding-status');
         }
+    }
+
+    /**
+     * Match first full binding or partial if it belongs to the higher scope in the current context.
+     *
+     * Keybinidngs priority:
+     * - keybining scope
+     * - registraion order within scope
+     */
+    matchKeybiding(keySequence: KeySequence, event?: KeyboardEvent): KeybindingRegistry.Match {
+        let partial: ScopedKeybinding | undefined;
+        for (let scope = KeybindingScope.END; --scope >= KeybindingScope.DEFAULT;) {
+            if (partial) {
+                return { kind: 'partial', binding: partial };
+            }
+            for (const binding of this.keymaps[scope]) {
+                const resolved = this.resolveKeybinding(binding);
+                const compareResult = KeySequence.compare(keySequence, resolved);
+                if (compareResult === KeySequence.CompareResult.FULL && (!event || this.isEnabled(binding, event))) {
+                    return { kind: 'full', binding };
+                }
+                if (!partial && compareResult === KeySequence.CompareResult.PARTIAL && (!event || this.isEnabled(binding, event))) {
+                    partial = binding;
+                }
+            }
+        }
+        return undefined;
     }
 
     /**
@@ -641,6 +630,10 @@ export class KeybindingRegistry {
 }
 
 export namespace KeybindingRegistry {
+    export type Match = {
+        kind: 'full' | 'partial'
+        binding: ScopedKeybinding
+    } | undefined;
     export class KeybindingsResult {
         full: ScopedKeybinding[] = [];
         partial: ScopedKeybinding[] = [];

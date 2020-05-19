@@ -30,7 +30,6 @@ describe('Keybindings', function () {
     const { EditorManager } = require('@theia/editor/lib/browser/editor-manager');
     const Uri = require('@theia/core/lib/common/uri');
     const { WorkspaceService } = require('@theia/workspace/lib/browser/workspace-service');
-    const { MonacoEditor } = require('@theia/monaco/lib/browser/monaco-editor');
 
     /** @type {import('inversify').Container} */
     const container = window['theia'].container;
@@ -62,7 +61,7 @@ describe('Keybindings', function () {
         assert.equal(executedCommand, TerminalCommands.TERMINAL_CLEAR.id);
     });
 
-    it("disabled keybinding should not override enabled", async () => {
+    it('disabled keybinding should not override enabled', async () => {
         const id = '__test:keybindings.left';
         toTearDown.push(commands.registerCommand({ id }, {
             execute: () => { }
@@ -71,7 +70,7 @@ describe('Keybindings', function () {
             command: '__test:keybindings.left',
             keybinding: 'left',
             when: 'false'
-        }, true));
+        }));
 
         const editor = await editorManager.open(new Uri.default(workspaceService.tryGetRoots()[0].uri).resolve('package.json'), {
             mode: 'activate',
