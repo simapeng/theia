@@ -22,6 +22,8 @@ import { TimelineTreeWidget } from './timeline-tree-widget';
 import { createTreeContainer, TreeModel, TreeModelImpl, TreeWidget } from '@theia/core/lib/browser';
 import { TimelineTreeModel } from './timeline-tree-model';
 
+import '../../src/browser/style/index.css';
+
 export default new ContainerModule(bind => {
     bind(TimelineService).toSelf().inSingletonScope();
 
@@ -31,7 +33,7 @@ export default new ContainerModule(bind => {
         createWidget: () => container.get(TimelineWidget)
     })).inSingletonScope();
     bind(TimelineTreeWidget).toDynamicValue(ctx => {
-        const child = createScmTreeContainer(ctx.container);
+        const child = createTimelineTreeContainer(ctx.container);
         return child.get(TimelineTreeWidget);
     });
     bind(WidgetFactory).toDynamicValue(({ container }) => ({
@@ -40,7 +42,7 @@ export default new ContainerModule(bind => {
     })).inSingletonScope();
 });
 
-export function createScmTreeContainer(parent: interfaces.Container): Container {
+export function createTimelineTreeContainer(parent: interfaces.Container): Container {
     const child = createTreeContainer(parent, {
         virtualized: true,
         search: true

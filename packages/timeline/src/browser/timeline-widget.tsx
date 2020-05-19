@@ -35,10 +35,8 @@ export class TimelineWidget extends BaseWidget implements StatefulWidget {
 
     constructor() {
         super();
-        this.node.tabIndex = 0;
         this.id = TimelineWidget.ID;
-        this.addClass('theia-scm');
-        this.addClass('theia-scm-main-container');
+        this.addClass('theia-timeline');
     }
 
     @postConstruct()
@@ -50,7 +48,6 @@ export class TimelineWidget extends BaseWidget implements StatefulWidget {
             })
         });
         this.panel.node.tabIndex = -1;
-        this.panel.node.setAttribute('class', 'theia-scm-panel');
         layout.addWidget(this.panel);
         this.containerLayout.addWidget(this.resourceWidget);
 

@@ -78,6 +78,7 @@ import { SymbolInformation } from 'vscode-languageserver-types';
 import { ArgumentProcessor } from '../plugin/command-registry';
 import { MaybePromise } from '@theia/core/lib/common/types';
 import { QuickTitleButton } from '@theia/core/lib/common/quick-open-model';
+import { TimelineChangeEvent } from '@theia/timeline/lib/browser/timeline-service';
 
 export interface PreferenceData {
     [scope: number]: any;
@@ -514,7 +515,8 @@ export interface TimelineExt {
 }
 
 export interface TimelineMain {
-    $registerTimelineProvider(sourceControlHandle: number, id: string, label: string): void;
+    $registerTimelineProvider(id: string, label: string, scheme: string | string[]): void;
+    $fireTimelineChanged(e: TimelineChangeEvent | undefined): void;
 }
 
 export interface DialogsMain {

@@ -144,6 +144,6 @@ export function setUpPluginApi(rpc: RPCProtocol, container: interfaces.Container
     const clipboardMain = new ClipboardMainImpl(container);
     rpc.set(PLUGIN_RPC_CONTEXT.CLIPBOARD_MAIN, clipboardMain);
 
-    const timelineMain = new TimelineMainImpl(container);
+    const timelineMain = new TimelineMainImpl(rpc, container);
     rpc.set(PLUGIN_RPC_CONTEXT.TIMELINE_MAIN, timelineMain);
 }
